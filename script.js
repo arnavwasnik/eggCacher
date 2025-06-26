@@ -137,4 +137,15 @@ function handleCollision(item) {
 function showResult() {
   finalScore.textContent = score;
   resultPopup.style.display = 'block';
+  try {
+        window.parent.postMessage(
+            {
+                type: 'GAME_OVER',
+                score: score,
+            },
+            'http://localhost:5173' // ✅ React app origin
+        );
+    } catch (err) {
+        console.error('❌ Failed to postMessage to parent:', err);
+    }
 }
