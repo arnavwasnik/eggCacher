@@ -1,3 +1,4 @@
+
 const basket = document.getElementById('basket');
 const gameArea = document.getElementById('gameArea');
 const scoreDisplay = document.getElementById('score');
@@ -8,6 +9,7 @@ const resultPopup = document.getElementById('resultPopup');
 const finalScore = document.getElementById('finalScore');
 const eggSound = document.getElementById('eggSound');
 const bombSound = document.getElementById('bombSound');
+const basketSlider = document.getElementById('basketSlider');
 
 let score = 0;
 let timeLeft = 60;
@@ -15,49 +17,76 @@ let gameRunning = false;
 let items = [];
 let eggCount = 0;
 let keys = {};
+let isDragging = false;
+let startX = 0;
+let basketStartX = 0;
+let targetLeft = null;
 
+// Touch movement
+gameArea.addEventListener("touchstart", (e) => {
+  if (e.touches.length === 1) {
+    isDragging = true;
+    startX = e.touches[0].clientX;
+    basketStartX = parseFloat(getComputedStyle(basket).left) || basket.offsetLeft;
+  }
+});
+
+gameArea.addEventListener("touchmove", (e) => {
+  if (!isDragging) return;
+  const touchX = e.touches[0].clientX;
+  const deltaX = touchX - startX;
+  let newLeft = basketStartX + deltaX;
+  const maxLeft = gameArea.clientWidth - basket.offsetWidth;
+  newLeft = Math.max(0, Math.min(newLeft, maxLeft));
+  basket.style.left = `${newLeft}px`;
+  updateSliderFromBasket();
+});
+
+gameArea.addEventListener("touchend", () => {
+  isDragging = false;
+});
+
+// Slider movement
+basketSlider.addEventListener("input", () => {
+  const percent = parseInt(basketSlider.value);
+  const maxLeft = gameArea.clientWidth - basket.offsetWidth;
+  const newLeft = (percent / 100) * maxLeft;
+  basket.style.left = `${newLeft}px`;
+});
+
+// Keyboard input
 document.addEventListener('keydown', (e) => keys[e.key] = true);
 document.addEventListener('keyup', (e) => keys[e.key] = false);
 
-document.getElementById('leftBtn').addEventListener('click', () => move('left'));
-document.getElementById('rightBtn').addEventListener('click', () => move('right'));
-
 startBtn.addEventListener('click', () => {
   startPopup.style.display = 'none';
+  resultPopup.style.display = 'none';
   gameRunning = true;
+  score = 0;
+  timeLeft = 60;
+  eggCount = 0;
+  scoreDisplay.textContent = score;
+  timerDisplay.textContent = timeLeft;
+  basket.style.backgroundImage = "url('basket.png')";
+  basket.style.left = `${(gameArea.clientWidth - basket.offsetWidth) / 2}px`;
+  updateSliderFromBasket();
+  items.forEach(i => i.el.remove());
+  items = [];
   startGame();
 });
 
-function move(direction) {
-  const step = 40; // faster
-  let left = basket.offsetLeft;
-  if (direction === 'left' && left > 0) {
-    basket.style.left = `${left - step}px`;
-  }
-  if (direction === 'right' && left + basket.offsetWidth < gameArea.clientWidth) {
-    basket.style.left = `${left + step}px`;
-  }
+function updateSliderFromBasket() {
+  const maxLeft = gameArea.clientWidth - basket.offsetWidth;
+  const currentLeft = parseFloat(basket.style.left) || 0;
+  const percent = (currentLeft / maxLeft) * 100;
+  basketSlider.value = percent;
 }
-
-function moveBasket() {
-  const step = 8; // faster
-  let left = basket.offsetLeft;
-  if (keys['ArrowLeft'] && left > 0) {
-    basket.style.left = `${left - step}px`;
-  }
-  if (keys['ArrowRight'] && left + basket.offsetWidth < gameArea.clientWidth) {
-    basket.style.left = `${left + step}px`;
-  }
-}
-
 
 function startGame() {
-  // Center the basket properly
-  basket.style.left = `${(gameArea.clientWidth - basket.offsetWidth) / 2}px`;
-
   countdown();
   spawnLoop();
   updateLoop();
+  smoothBasketMovement();
 }
 
 function countdown() {
@@ -91,8 +120,25 @@ function spawnItem() {
 
 function updateLoop() {
   if (gameRunning) requestAnimationFrame(updateLoop);
-  moveBasket();
   updateItems();
+  moveWithKeys();
+}
+
+function moveWithKeys() {
+  const step = 20; // ⬆️ Increased speed
+  const maxLeft = gameArea.clientWidth - basket.offsetWidth;
+  let left = parseFloat(basket.style.left) || basket.offsetLeft;
+
+  if (keys['ArrowLeft']) {
+    left = Math.max(0, left - step);
+    basket.style.left = `${left}px`;
+    updateSliderFromBasket();
+  }
+  if (keys['ArrowRight']) {
+    left = Math.min(maxLeft, left + step);
+    basket.style.left = `${left}px`;
+    updateSliderFromBasket();
+  }
 }
 
 function updateItems() {
@@ -130,22 +176,20 @@ function handleCollision(item) {
     bombSound.play();
   }
   scoreDisplay.textContent = score;
-
   basket.style.backgroundImage = eggCount >= 3 ? "url('basket-full.png')" : "url('basket.png')";
 }
 
 function showResult() {
   finalScore.textContent = score;
   resultPopup.style.display = 'block';
+
   try {
-        window.parent.postMessage(
-            {
-                type: 'GAME_OVER',
-                score: score,
-            },
-            'http://localhost:5173' // ✅ React app origin
-        );
-    } catch (err) {
-        console.error('❌ Failed to postMessage to parent:', err);
-    }
+    window.parent.postMessage({ type: 'GAME_OVER', score: score }, 'http://localhost:5173');
+  } catch (err) {
+    console.error('postMessage error:', err);
+  }
+}
+
+function smoothBasketMovement() {
+  requestAnimationFrame(smoothBasketMovement);
 }
