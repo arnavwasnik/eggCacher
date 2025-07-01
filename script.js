@@ -1,3 +1,4 @@
+
 const basket = document.getElementById('basket');
 const gameArea = document.getElementById('gameArea');
 const scoreDisplay = document.getElementById('score');
@@ -15,49 +16,60 @@ let gameRunning = false;
 let items = [];
 let eggCount = 0;
 let keys = {};
+let isDragging = false;
+let startX = 0;
+let basketStartX = 0;
+let targetLeft = null;
 
+// Touch dragging (works on laptop touchscreen, tablet, mobile)
+gameArea.addEventListener("touchstart", (e) => {
+  if (e.touches.length === 1) {
+    isDragging = true;
+    startX = e.touches[0].clientX;
+    basketStartX = parseFloat(getComputedStyle(basket).left) || basket.offsetLeft;
+  }
+});
+
+gameArea.addEventListener("touchmove", (e) => {
+  if (!isDragging) return;
+  const touchX = e.touches[0].clientX;
+  const deltaX = touchX - startX;
+  let newLeft = basketStartX + deltaX;
+  const maxLeft = gameArea.clientWidth - basket.offsetWidth;
+  newLeft = Math.max(0, Math.min(newLeft, maxLeft));
+  targetLeft = newLeft;
+});
+
+gameArea.addEventListener("touchend", () => {
+  isDragging = false;
+});
+
+// Keyboard movement
 document.addEventListener('keydown', (e) => keys[e.key] = true);
 document.addEventListener('keyup', (e) => keys[e.key] = false);
 
-document.getElementById('leftBtn').addEventListener('click', () => move('left'));
-document.getElementById('rightBtn').addEventListener('click', () => move('right'));
-
+// Start game
 startBtn.addEventListener('click', () => {
   startPopup.style.display = 'none';
+  resultPopup.style.display = 'none';
   gameRunning = true;
+  score = 0;
+  timeLeft = 60;
+  eggCount = 0;
+  scoreDisplay.textContent = score;
+  timerDisplay.textContent = timeLeft;
+  basket.style.backgroundImage = "url('basket.png')";
+  basket.style.left = `${(gameArea.clientWidth - basket.offsetWidth) / 2}px`;
+  items.forEach(i => i.el.remove());
+  items = [];
   startGame();
 });
 
-function move(direction) {
-  const step = 40; // faster
-  let left = basket.offsetLeft;
-  if (direction === 'left' && left > 0) {
-    basket.style.left = `${left - step}px`;
-  }
-  if (direction === 'right' && left + basket.offsetWidth < gameArea.clientWidth) {
-    basket.style.left = `${left + step}px`;
-  }
-}
-
-function moveBasket() {
-  const step = 8; // faster
-  let left = basket.offsetLeft;
-  if (keys['ArrowLeft'] && left > 0) {
-    basket.style.left = `${left - step}px`;
-  }
-  if (keys['ArrowRight'] && left + basket.offsetWidth < gameArea.clientWidth) {
-    basket.style.left = `${left + step}px`;
-  }
-}
-
-
 function startGame() {
-  // Center the basket properly
-  basket.style.left = `${(gameArea.clientWidth - basket.offsetWidth) / 2}px`;
-
   countdown();
   spawnLoop();
   updateLoop();
+  smoothBasketMovement();
 }
 
 function countdown() {
@@ -91,7 +103,6 @@ function spawnItem() {
 
 function updateLoop() {
   if (gameRunning) requestAnimationFrame(updateLoop);
-  moveBasket();
   updateItems();
 }
 
@@ -137,15 +148,38 @@ function handleCollision(item) {
 function showResult() {
   finalScore.textContent = score;
   resultPopup.style.display = 'block';
+
+  // Send to backend
   try {
-        window.parent.postMessage(
-            {
-                type: 'GAME_OVER',
-                score: score,
-            },
-            'http://localhost:5173' // ✅ React app origin
-        );
-    } catch (err) {
-        console.error('❌ Failed to postMessage to parent:', err);
+    window.parent.postMessage({ type: 'GAME_OVER', score: score }, 'http://localhost:5173');
+  } catch (err) {
+    console.error('Failed to postMessage to parent:', err);
+  }
+}
+
+// Smooth movement for touch and arrow keys
+function smoothBasketMovement() {
+  const currentLeft = parseFloat(getComputedStyle(basket).left) || 0;
+  const maxLeft = gameArea.clientWidth - basket.offsetWidth;
+
+  if (targetLeft !== null) {
+    const diff = targetLeft - currentLeft;
+    const ease = diff * 0.6;
+    if (Math.abs(diff) < 1) {
+      basket.style.left = `${targetLeft}px`;
+      targetLeft = null;
+    } else {
+      basket.style.left = `${currentLeft + ease}px`;
     }
+  }
+
+  const current = parseFloat(basket.style.left) || basket.offsetLeft;
+  if (keys['ArrowLeft']) {
+    targetLeft = Math.max(0, current - 15);
+  }
+  if (keys['ArrowRight']) {
+    targetLeft = Math.min(maxLeft, current + 15);
+  }
+
+  requestAnimationFrame(smoothBasketMovement);
 }
