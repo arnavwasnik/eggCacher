@@ -183,11 +183,12 @@ function showResult() {
   finalScore.textContent = score;
   resultPopup.style.display = 'block';
 
-  try {
-    window.parent.postMessage({ type: 'GAME_OVER', score: score }, 'http://localhost:5173');
-  } catch (err) {
-    console.error('postMessage error:', err);
-  }
+const origin = window.location.hostname.includes("localhost")
+  ? "http://localhost:5173"
+  : "https://www.fulboost.fun";
+
+window.parent.postMessage({ type: "GAME_OVER", score: score }, origin);
+
 }
 
 function smoothBasketMovement() {
