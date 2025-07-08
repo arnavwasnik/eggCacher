@@ -185,7 +185,7 @@ function showResult() {
 
 const origin = window.location.hostname.includes("localhost")
   ? "http://localhost:5173"
-  : "https://www.fulboost.fun";
+  : "https://fulboost.fun";
 
 window.parent.postMessage({ type: "GAME_OVER", score: score }, origin);
 
