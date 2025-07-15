@@ -10,6 +10,8 @@ const finalScore = document.getElementById('finalScore');
 const eggSound = document.getElementById('eggSound');
 const bombSound = document.getElementById('bombSound');
 const basketSlider = document.getElementById('basketSlider');
+const bgm = document.getElementById('bgm'); //new sound added
+
 
 let score = 0;
 let timeLeft = 60;
@@ -61,6 +63,10 @@ document.addEventListener('keyup', (e) => keys[e.key] = false);
 startBtn.addEventListener('click', () => {
   startPopup.style.display = 'none';
   resultPopup.style.display = 'none';
+
+  bgm.currentTime = 0;
+  bgm.play().catch(err => console.log("Autoplay blocked:", err)); //new sound effect
+
   gameRunning = true;
   score = 0;
   timeLeft = 60;
